@@ -50,15 +50,6 @@ jobs:
           echo "Creating deployment directory..."
           mkdir -p deploy
 
-          echo "Verifying .env file exists..."
-          ls -la .env
-          echo "Content of .env (checking if not empty):"
-          wc -l .env
-          if [ ! -s .env ]; then
-            echo "ERROR: .env file is empty! Check ENV_FILE secret."
-            exit 1
-          fi
-
           echo "Creating archive with build files..."
           cd build
           tar -czf ../deploy/f-suite-landing.tar.gz .
