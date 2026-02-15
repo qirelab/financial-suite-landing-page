@@ -1,0 +1,106 @@
+name: Deploy f-suite-landing to VPS
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '23'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Security audit
+        run: npm audit --audit-level=critical
+        continue-on-error: false
+
+      - name: Create .env file
+        run: |
+          echo "Creating .env file from secrets..."
+          cat > .env << 'EOF'
+          ${{ secrets.ENV_FILE }}
+          EOF
+          echo ".env file created successfully!"
+          echo "File size (bytes and lines):"
+          wc .env
+          echo "First 3 lines:"
+          head -n 3 .env
+
+      - name: Build project
+        run: |
+          set -a
+          source .env
+          set +a
+          npm run build
+
+      - name: Prepare deployment archive
+        run: |
+          echo "Creating deployment directory..."
+          mkdir -p deploy
+
+          echo "Verifying .env file exists..."
+          ls -la .env
+          echo "Content of .env (checking if not empty):"
+          wc -l .env
+          if [ ! -s .env ]; then
+            echo "ERROR: .env file is empty! Check ENV_FILE secret."
+            exit 1
+          fi
+
+          echo "Creating archive with build files..."
+          cd build
+          tar -czf ../deploy/f-suite-landing.tar.gz .
+          cd ..
+
+          echo "Archive created successfully!"
+          ls -lh deploy/
+
+      - name: Copy archive to VPS
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USERNAME }}
+          key: ${{ secrets.VPS_KEY }}
+          port: ${{ secrets.VPS_PORT || 22 }}
+          source: "deploy/f-suite-landing.tar.gz"
+          target: "/tmp/"
+          strip_components: 1
+
+      - name: Deploy on VPS
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USERNAME }}
+          key: ${{ secrets.VPS_KEY }}
+          port: ${{ secrets.VPS_PORT || 22 }}
+          script: |
+            set -e
+
+            echo "Starting deployment..."
+
+            # Clean up old deployment
+            echo "Cleaning old deployment..."
+            rm -rf /var/www/f-suite-landing
+            mkdir -p /var/www/f-suite-landing/build
+
+            # Extract archive
+            echo "Extracting archive..."
+            tar -xzf /tmp/f-suite-landing.tar.gz -C /var/www/f-suite-landing/build/
+
+            # Clean up archive
+            rm -f /tmp/f-suite-landing.tar.gz
+
+            echo "Deployment completed successfully!"
+            ls -la /var/www/f-suite-landing/build/
