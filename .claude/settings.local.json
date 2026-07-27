@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(npm install:*)",
-      "WebFetch(domain:app.f-suite.com)"
+      "WebFetch(domain:app.f-suite.com)",
+      "Bash(git rm:*)",
+      "Bash(dir /b \"C:\\\\Study\\\\commercial-projects\\\\financial-suite\")"
     ],
     "deny": [],
     "ask": []
