@@ -55,6 +55,9 @@ jobs:
           tar -czf ../deploy/f-suite-landing.tar.gz .
           cd ..
 
+          echo "Adding contact form API..."
+          tar -czf deploy/f-suite-api.tar.gz -C server index.mjs ecosystem.config.cjs
+
           echo "Archive created successfully!"
           ls -lh deploy/
 
@@ -65,7 +68,7 @@ jobs:
           username: ${{ secrets.VPS_USERNAME }}
           key: ${{ secrets.VPS_KEY }}
           port: ${{ secrets.VPS_PORT || 22 }}
-          source: "deploy/f-suite-landing.tar.gz"
+          source: "deploy/f-suite-landing.tar.gz,deploy/f-suite-api.tar.gz"
           target: "/tmp/"
           strip_components: 1
 
@@ -92,6 +95,15 @@ jobs:
 
             # Clean up archive
             rm -f /tmp/f-suite-landing.tar.gz
+
+            # Update and restart contact form API (one-time setup: see BREVO_SETUP.md)
+            # The directory is kept between deploys: it holds the .env with the Brevo key
+            echo "Deploying contact form API..."
+            mkdir -p /var/www/f-suite-api
+            tar -xzf /tmp/f-suite-api.tar.gz -C /var/www/f-suite-api/
+            rm -f /tmp/f-suite-api.tar.gz
+            pm2 startOrReload /var/www/f-suite-api/ecosystem.config.cjs --update-env
+            pm2 save
 
             echo "Deployment completed successfully!"
             ls -la /var/www/f-suite-landing/build/

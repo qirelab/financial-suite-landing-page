@@ -88,5 +88,9 @@
     server: {
       port: 3000,
       open: true,
+      // Run `npm run api` alongside `npm run dev` to test the forms locally
+      proxy: {
+        '/api': 'http://127.0.0.1:1804',
+      },
     },
   });

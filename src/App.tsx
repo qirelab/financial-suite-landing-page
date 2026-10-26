@@ -18,7 +18,7 @@ import { NavHashLink } from './components/NavHashLink';
 import { FooterLink } from './components/FooterLink';
 import img128X1281 from "figma:asset/fb623f6b059b888cf4155f7c95166d688f80915a.png";
 import svgPaths from "./imports/svg-cogyjin2po";
-import { initEmailJS, sendPartnerFormEmail } from './services/emailService';
+import { sendPartnerFormEmail } from './services/emailService';
 import { useAlert } from './context/AlertContext';
 
 // Header Component
@@ -269,9 +269,6 @@ export default function App() {
       easing: 'ease-out-cubic',
       offset: 100,
     });
-
-    // Initialize EmailJS
-    initEmailJS();
   }, []);
 
   // Minimum splash screen time: 2 seconds

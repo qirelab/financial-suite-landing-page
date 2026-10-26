@@ -16,7 +16,7 @@ Original design: [Figma](https://www.figma.com/design/NqGKIYuDybTBHNCENVBqiM/Fin
 | Styling | Tailwind CSS v4 (prebuilt into `src/index.css`) + per-component CSS |
 | UI primitives | Radix UI, `lucide-react`, `class-variance-authority` |
 | Animation | AOS (scroll animations) |
-| Forms → email | EmailJS (`@emailjs/browser`) |
+| Forms → email | Brevo, via a small Node API in [server/](server/) |
 | Images | `vite-plugin-image-optimizer` (PNG/JPEG q80) |
 | Hosting | nginx on a VPS, deployed by GitHub Actions |
 
@@ -26,33 +26,35 @@ Requirements: Node.js 20+ (CI builds on Node 23) and npm.
 
 ```bash
 npm i                  # install dependencies
-cp .env.example .env   # fill in EmailJS credentials
 npm run dev            # dev server on http://localhost:3000 (opens automatically)
 npm run build          # production build into build/
+npm run api            # contact form API on 127.0.0.1:1804 (needs server/.env, Node 20.6+)
 ```
 
 There is no `preview` script — to check a production build locally, run `npx vite preview --outDir build`.
 
 ## Environment variables
 
-All variables are `VITE_`-prefixed, so they are **embedded into the client bundle** — never put anything secret here. See [.env.example](.env.example).
+The frontend currently needs no variables. Any `VITE_`-prefixed variable is **embedded into the client bundle** — never put anything secret there. See [.env.example](.env.example).
+
+The contact form API reads its config from the environment ([server/.env.example](server/.env.example); on the VPS — `/var/www/f-suite-api/.env`):
 
 | Variable | Purpose |
 |---|---|
-| `VITE_EMAILJS_SERVICE_ID` | EmailJS service ID |
-| `VITE_EMAILJS_TEMPLATE_ID` | EmailJS template ID |
-| `VITE_EMAILJS_PUBLIC_KEY` | EmailJS public key |
-| `VITE_CONTACT_EMAIL` | Address that receives form submissions |
+| `BREVO_API_KEY` | Brevo API key (secret) |
+| `MAIL_FROM` / `MAIL_FROM_NAME` | Sender on the Brevo-verified domain (default `noreply@f-suite.com`) |
+| `MAIL_TO` | Address that receives form submissions |
+| `HOST` / `PORT` | Listen address (default `127.0.0.1:1804`) |
 
-If they are missing, [src/services/emailService.ts](src/services/emailService.ts) falls back to placeholder values and email sending will fail.
-Full walkthrough: [EMAILJS_SETUP.md](EMAILJS_SETUP.md).
+Full walkthrough, including the one-time VPS setup: [BREVO_SETUP.md](BREVO_SETUP.md).
 
 ## Project structure
 
 ```
 index.html            # entry HTML: SEO, Open Graph, PWA meta tags
 vite.config.ts        # aliases (incl. figma:asset/*), build.outDir = build/
-nginx.conf            # production server block for f-suite.com
+nginx.conf            # production server block for f-suite.com (static + /api/ proxy)
+server/               # contact form API (Brevo) + pm2 ecosystem config
 public/               # manifest.json, service-worker.js, robots.txt
 src/
   main.tsx            # providers + service worker registration
@@ -63,7 +65,7 @@ src/
     figma/            # components imported from Figma
   context/            # LocalizationContext, AlertContext
   locales/            # en.ts, pl.ts, ru.ts
-  services/           # emailService.ts
+  services/           # emailService.ts (POST /api/contact)
   styles/             # globals.css (design tokens), FormStyles.css
   index.css           # generated Tailwind v4 output — do not hand-edit
   assets/ icons/ imports/
@@ -96,12 +98,13 @@ Pushing to `master` triggers [.github/workflows/deploy.yml](.github/workflows/de
 2. writes `.env` from the `ENV_FILE` secret, sources it, runs `npm run build`
 3. packs `build/` into `f-suite-landing.tar.gz` and copies it to the VPS over SCP
 4. replaces `/var/www/f-suite-landing/build` with the new bundle
+5. copies `server/index.mjs` + `ecosystem.config.cjs` to `/var/www/f-suite-api/` and reloads the `f-suite-api` pm2 app
 
 Required repository secrets:
 
 | Secret | Purpose |
 |---|---|
-| `ENV_FILE` | Full contents of the production `.env` |
+| `ENV_FILE` | Full contents of the production frontend `.env` (may be empty; Brevo config is not here) |
 | `VPS_HOST` | Server host |
 | `VPS_USERNAME` | SSH user |
 | `VPS_KEY` | SSH private key |
@@ -111,7 +114,7 @@ nginx serves the extracted `build/` directory — see [nginx.conf](nginx.conf). 
 
 ## Notes for contributors
 
-- `build/`, `node_modules/` and `.env` are gitignored; only `.env.example` is committed.
+- `build/`, `node_modules/` and `.env` files are gitignored; only the `.env.example` templates are committed.
 - `src/index.css` is compiled Tailwind output — change design tokens in [src/styles/globals.css](src/styles/globals.css) instead.
 - `vite.config.ts` maps `figma:asset/<hash>.png` specifiers to files in `src/assets/`; keep the alias list in sync when new Figma assets are added.
 - Asset credits: [src/Attributions.md](src/Attributions.md).

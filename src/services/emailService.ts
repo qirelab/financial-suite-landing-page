@@ -1,74 +1,39 @@
-import emailjs from '@emailjs/browser';
+// Form submissions go to our own API (server/index.mjs), which sends them via Brevo.
+// The Brevo API key lives only on the server.
 
-// EmailJS configuration
-// These values should be obtained from https://www.emailjs.com/
-const EMAILJS_SERVICE_ID = import.meta.env.VITE_EMAILJS_SERVICE_ID || 'YOUR_SERVICE_ID';
-const EMAILJS_TEMPLATE_ID = import.meta.env.VITE_EMAILJS_TEMPLATE_ID || 'YOUR_TEMPLATE_ID';
-const EMAILJS_PUBLIC_KEY = import.meta.env.VITE_EMAILJS_PUBLIC_KEY || 'YOUR_PUBLIC_KEY';
-const CONTACT_EMAIL = import.meta.env.VITE_CONTACT_EMAIL || 'prodbykarlmann@gmail.com';
+type FormType = 'demo' | 'partner';
 
-// Initialize EmailJS
-export const initEmailJS = () => {
-  emailjs.init(EMAILJS_PUBLIC_KEY);
-};
-
-// Send demo form email
-export const sendDemoFormEmail = async (data: {
-  name: string;
-  email: string;
-  company: string;
-}) => {
+const submitForm = async (formType: FormType, data: Record<string, string | undefined>) => {
   try {
-    const templateParams = {
-      to_email: CONTACT_EMAIL,
-      from_name: data.name,
-      from_email: data.email,
-      company: data.company,
-      message: `New demo request from ${data.name} (${data.email}) at ${data.company}`,
-      form_type: 'Demo Request',
-    };
+    const response = await fetch('/api/contact', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ formType, ...data }),
+    });
 
-    const response = await emailjs.send(
-      EMAILJS_SERVICE_ID,
-      EMAILJS_TEMPLATE_ID,
-      templateParams
-    );
+    if (!response.ok) {
+      throw new Error(`Request failed with status ${response.status}`);
+    }
 
-    return { success: true, response };
+    return { success: true };
   } catch (error) {
     console.error('Failed to send email:', error);
     return { success: false, error };
   }
 };
 
+// Send demo form email
+export const sendDemoFormEmail = (data: {
+  name: string;
+  email: string;
+  company: string;
+}) => submitForm('demo', data);
+
 // Send partner form email
-export const sendPartnerFormEmail = async (data: {
+export const sendPartnerFormEmail = (data: {
   name: string;
   email: string;
   company: string;
   phone?: string;
   message?: string;
-}) => {
-  try {
-    const templateParams = {
-      to_email: CONTACT_EMAIL,
-      from_name: data.name,
-      from_email: data.email,
-      company: data.company,
-      phone: data.phone || 'Not provided',
-      message: data.message || 'No message provided',
-      form_type: 'Partner Request',
-    };
-
-    const response = await emailjs.send(
-      EMAILJS_SERVICE_ID,
-      EMAILJS_TEMPLATE_ID,
-      templateParams
-    );
-
-    return { success: true, response };
-  } catch (error) {
-    console.error('Failed to send email:', error);
-    return { success: false, error };
-  }
-};
+}) => submitForm('partner', data);
