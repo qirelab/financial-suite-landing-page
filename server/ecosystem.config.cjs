@@ -1,5 +1,5 @@
 // pm2 config for the contact form API.
-// Secrets are read from .env next to this file (on the VPS: /var/www/f-suite-api/.env, chmod 600).
+// Secrets are read from .env next to this file (on the VPS: /var/www/f-suite-api/.env, written by deploy from ENV_FILE).
 // Start/reload: pm2 startOrReload ecosystem.config.cjs --update-env
 
 const fs = require('node:fs');

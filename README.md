@@ -37,7 +37,7 @@ There is no `preview` script — to check a production build locally, run `npx v
 
 The frontend currently needs no variables. Any `VITE_`-prefixed variable is **embedded into the client bundle** — never put anything secret there. See [.env.example](.env.example).
 
-The contact form API reads its config from the environment ([server/.env.example](server/.env.example); on the VPS — `/var/www/f-suite-api/.env`):
+The contact form API reads its config from the environment ([server/.env.example](server/.env.example); on the VPS — `/var/www/f-suite-api/.env`, written by deploy from the `ENV_FILE` secret):
 
 | Variable | Purpose |
 |---|---|
@@ -106,7 +106,7 @@ Required repository secrets:
 
 | Secret | Purpose |
 |---|---|
-| `ENV_FILE` | Full contents of the production frontend `.env` (may be empty; Brevo config is not here) |
+| `ENV_FILE` | Production `.env`: used for the build and copied to the VPS as the API config (`SMTP_*`, `CONTACT_TO`) |
 | `VPS_HOST` | Server host |
 | `VPS_USERNAME` | SSH user |
 | `VPS_KEY` | SSH private key |

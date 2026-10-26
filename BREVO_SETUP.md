@@ -41,32 +41,30 @@ Run everything as the SSH user from the `VPS_USERNAME` secret — pm2 runs the A
    ssh <user>@<host> 'pm2 --version'   # from your machine
    ```
 
-2. Create the API directory and the config with real values
-   (template: [server/.env.example](server/.env.example)). Deploy never deletes this directory:
-
-   ```bash
-   mkdir -p /var/www/f-suite-api
-   nano /var/www/f-suite-api/.env
-   chmod 600 /var/www/f-suite-api/.env
-   ```
+2. Put the API config into the `ENV_FILE` repository secret
+   (GitHub → Settings → Secrets and variables → Actions), template:
+   [server/.env.example](server/.env.example). Deploy writes it to
+   `/var/www/f-suite-api/.env` with `chmod 600` on every push — edit the secret, not the file on the server.
 
 3. Make pm2 start on boot: run `pm2 startup` and execute the command it prints (needs sudo once).
 
 4. Add the `location /api/` block from [nginx.conf](nginx.conf) to the site config, then
    `sudo nginx -t && sudo systemctl reload nginx`.
 
-5. Push to `master`. The deploy copies `index.mjs` and `ecosystem.config.cjs` to
+5. Push to `master`. The deploy copies `index.mjs`, `ecosystem.config.cjs` and `.env` to
    `/var/www/f-suite-api/`, runs `npm ci --omit=dev` there, then `pm2 startOrReload ... --update-env` and `pm2 save`
    (see [.github/workflows/deploy.yml](.github/workflows/deploy.yml)).
 
 6. Check it end to end:
 
    ```bash
-   curl -i -X POST https://f-suite.com/api/contact      -H 'Content-Type: application/json'      -d '{"formType":"partner","name":"Test","email":"test@example.com","company":"Test"}'
+   curl -i -X POST https://f-suite.com/api/contact \
+     -H 'Content-Type: application/json' \
+     -d '{"formType":"partner","name":"Test","email":"test@example.com","company":"Test"}'
    ```
 
 The API listens on `127.0.0.1:1804` — only nginx reaches it, no firewall changes needed.
-After editing `.env`, apply it with `pm2 startOrReload /var/www/f-suite-api/ecosystem.config.cjs --update-env`.
+To change a variable, update `ENV_FILE` and re-run the deploy workflow.
 
 Logs: `pm2 logs f-suite-api`.
 

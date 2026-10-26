@@ -33,10 +33,8 @@ jobs:
           ${{ secrets.ENV_FILE }}
           EOF
           echo ".env file created successfully!"
-          echo "File size (bytes and lines):"
-          wc .env
-          echo "First 3 lines:"
-          head -n 3 .env
+          echo "Variables (values hidden):"
+          grep -oE '^[A-Za-z_][A-Za-z0-9_]*=' .env || true
 
       - name: Build project
         run: |
@@ -56,7 +54,8 @@ jobs:
           cd ..
 
           echo "Adding contact form API..."
-          tar -czf deploy/f-suite-api.tar.gz -C server index.mjs ecosystem.config.cjs package.json package-lock.json
+          # .env from the ENV_FILE secret goes along: the API reads SMTP_* / CONTACT_TO from it
+          tar -czf deploy/f-suite-api.tar.gz -C server index.mjs ecosystem.config.cjs package.json package-lock.json -C .. .env
 
           echo "Archive created successfully!"
           ls -lh deploy/
@@ -97,10 +96,10 @@ jobs:
             rm -f /tmp/f-suite-landing.tar.gz
 
             # Update and restart contact form API (one-time setup: see BREVO_SETUP.md)
-            # The directory is kept between deploys: it holds the .env with the Brevo key
             echo "Deploying contact form API..."
             mkdir -p /var/www/f-suite-api
             tar -xzf /tmp/f-suite-api.tar.gz -C /var/www/f-suite-api/
+            chmod 600 /var/www/f-suite-api/.env
             rm -f /tmp/f-suite-api.tar.gz
             (cd /var/www/f-suite-api && npm ci --omit=dev)
             pm2 startOrReload /var/www/f-suite-api/ecosystem.config.cjs --update-env
