@@ -56,7 +56,7 @@ jobs:
           cd ..
 
           echo "Adding contact form API..."
-          tar -czf deploy/f-suite-api.tar.gz -C server index.mjs ecosystem.config.cjs
+          tar -czf deploy/f-suite-api.tar.gz -C server index.mjs ecosystem.config.cjs package.json package-lock.json
 
           echo "Archive created successfully!"
           ls -lh deploy/
@@ -102,6 +102,7 @@ jobs:
             mkdir -p /var/www/f-suite-api
             tar -xzf /tmp/f-suite-api.tar.gz -C /var/www/f-suite-api/
             rm -f /tmp/f-suite-api.tar.gz
+            (cd /var/www/f-suite-api && npm ci --omit=dev)
             pm2 startOrReload /var/www/f-suite-api/ecosystem.config.cjs --update-env
             pm2 save
 

@@ -16,13 +16,13 @@ Original design: [Figma](https://www.figma.com/design/NqGKIYuDybTBHNCENVBqiM/Fin
 | Styling | Tailwind CSS v4 (prebuilt into `src/index.css`) + per-component CSS |
 | UI primitives | Radix UI, `lucide-react`, `class-variance-authority` |
 | Animation | AOS (scroll animations) |
-| Forms → email | Brevo, via a small Node API in [server/](server/) |
+| Forms → email | Brevo SMTP (nodemailer), via a small Node API in [server/](server/) |
 | Images | `vite-plugin-image-optimizer` (PNG/JPEG q80) |
 | Hosting | nginx on a VPS, deployed by GitHub Actions |
 
 ## Getting started
 
-Requirements: Node.js 20+ (CI builds on Node 23) and npm.
+Requirements: Node.js 20+ (CI builds on Node 23) and npm. The API in `server/` has its own `package.json` — run `npm ci` there once.
 
 ```bash
 npm i                  # install dependencies
@@ -41,9 +41,11 @@ The contact form API reads its config from the environment ([server/.env.example
 
 | Variable | Purpose |
 |---|---|
-| `BREVO_API_KEY` | Brevo API key (secret) |
-| `MAIL_FROM` / `MAIL_FROM_NAME` | Sender on the Brevo-verified domain (default `noreply@f-suite.com`) |
-| `MAIL_TO` | Address that receives form submissions |
+| `SMTP_HOST` / `SMTP_PORT` | Brevo SMTP relay (default `smtp-relay.brevo.com:587`) |
+| `SMTP_USER` | Brevo SMTP login (`…@smtp-brevo.com`) |
+| `SMTP_PASS` | Brevo SMTP key, `xsmtpsib-…` (secret) |
+| `SMTP_FROM` | Sender on the Brevo-verified domain (default `noreply@f-suite.com`) |
+| `CONTACT_TO` | Address that receives form submissions |
 | `HOST` / `PORT` | Listen address (default `127.0.0.1:1804`) |
 
 Full walkthrough, including the one-time VPS setup: [BREVO_SETUP.md](BREVO_SETUP.md).
@@ -98,7 +100,7 @@ Pushing to `master` triggers [.github/workflows/deploy.yml](.github/workflows/de
 2. writes `.env` from the `ENV_FILE` secret, sources it, runs `npm run build`
 3. packs `build/` into `f-suite-landing.tar.gz` and copies it to the VPS over SCP
 4. replaces `/var/www/f-suite-landing/build` with the new bundle
-5. copies `server/index.mjs` + `ecosystem.config.cjs` to `/var/www/f-suite-api/` and reloads the `f-suite-api` pm2 app
+5. copies the API from `server/` to `/var/www/f-suite-api/`, runs `npm ci --omit=dev` and reloads the `f-suite-api` pm2 app
 
 Required repository secrets:
 

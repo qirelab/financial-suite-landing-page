@@ -1,21 +1,30 @@
-// Contact form API: receives form submissions and forwards them to Brevo.
-// Runs on the VPS behind nginx (location /api/), so the Brevo API key never
-// reaches the browser and requests come from the IP authorized in Brevo.
-// No dependencies — requires Node.js 18+ (global fetch).
+// Contact form API: receives form submissions and sends them via Brevo SMTP relay.
+// Runs on the VPS behind nginx (location /api/), so SMTP credentials never
+// reach the browser and connections come from the IP authorized in Brevo.
 
 import { createServer } from 'node:http';
+import nodemailer from 'nodemailer';
 
 const PORT = Number(process.env.PORT) || 1804;
 const HOST = process.env.HOST || '127.0.0.1';
-const BREVO_API_KEY = process.env.BREVO_API_KEY;
-const MAIL_FROM = process.env.MAIL_FROM || 'noreply@f-suite.com';
-const MAIL_FROM_NAME = process.env.MAIL_FROM_NAME || 'Financial Suite';
-const MAIL_TO = process.env.MAIL_TO;
+const SMTP_PORT = Number(process.env.SMTP_PORT) || 587;
+const SMTP_FROM = process.env.SMTP_FROM || 'noreply@f-suite.com';
+const CONTACT_TO = process.env.CONTACT_TO;
 
-if (!BREVO_API_KEY || !MAIL_TO) {
-  console.error('BREVO_API_KEY and MAIL_TO must be set');
+if (!process.env.SMTP_USER || !process.env.SMTP_PASS || !CONTACT_TO) {
+  console.error('SMTP_USER, SMTP_PASS and CONTACT_TO must be set');
   process.exit(1);
 }
+
+const transporter = nodemailer.createTransport({
+  host: process.env.SMTP_HOST || 'smtp-relay.brevo.com',
+  port: SMTP_PORT,
+  secure: SMTP_PORT === 465,
+  auth: {
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS,
+  },
+});
 
 const MAX_BODY_BYTES = 10 * 1024;
 const FIELD_LIMITS = { name: 200, email: 200, company: 200, phone: 50, message: 5000 };
@@ -100,12 +109,12 @@ const buildEmail = (data) => {
     .join('');
 
   return {
-    sender: { email: MAIL_FROM, name: MAIL_FROM_NAME },
-    to: [{ email: MAIL_TO }],
-    replyTo: { email: data.email, name: data.name },
+    from: `"Financial Suite website" <${SMTP_FROM}>`,
+    to: CONTACT_TO,
+    replyTo: { name: data.name, address: data.email },
     subject: `${formType}: ${data.name} (${data.company})`,
-    htmlContent: `<h2>${formType}</h2><table>${htmlRows}</table>`,
-    textContent: rows.map(([label, value]) => `${label}: ${value}`).join('\n'),
+    html: `<h2>${formType}</h2><table>${htmlRows}</table>`,
+    text: rows.map(([label, value]) => `${label}: ${value}`).join('\n'),
   };
 };
 
@@ -124,20 +133,10 @@ const handleContact = async (req, res) => {
   if (!data) return sendJson(res, 400, { error: 'Invalid form data' });
 
   try {
-    const response = await fetch('https://api.brevo.com/v3/smtp/email', {
-      method: 'POST',
-      headers: { 'api-key': BREVO_API_KEY, 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify(buildEmail(data)),
-    });
-
-    if (!response.ok) {
-      console.error(`Brevo error ${response.status}: ${await response.text()}`);
-      return sendJson(res, 502, { error: 'Failed to send email' });
-    }
-
+    await transporter.sendMail(buildEmail(data));
     return sendJson(res, 200, { success: true });
   } catch (error) {
-    console.error('Brevo request failed:', error);
+    console.error('Failed to send email via SMTP:', error);
     return sendJson(res, 502, { error: 'Failed to send email' });
   }
 };
